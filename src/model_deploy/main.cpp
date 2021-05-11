@@ -37,12 +37,11 @@ const char* topic = "Mbed";
 Thread mqtt_thread(osPriorityHigh);
 Thread t_gesture;
 Thread t_tilt;
-Thread t_uLCD_mode;
 Config config;
+uLCD_4DGL uLCD(D1, D0, D2);
 
 EventQueue mqtt_queue;
 EventQueue queue;
-EventQueue mainQueue;
 int mode=0;
 int Cmode=1;
 // The gesture index of the prediction
@@ -74,6 +73,7 @@ void messageArrived(MQTT::MessageData& md) {
 void close_mqtt() {
     closed = true;
 }
+
 void Angle(){
     BSP_ACCELERO_Init();
 
@@ -127,8 +127,10 @@ void Angle(){
       }
     }
 }
+
 void select_tilt() {
   if(mode==2){
+
     wifi = WiFiInterface::get_default_instance();
     if (!wifi) {
             printf("ERROR: No WiFiInterface found.\r\n");
@@ -176,7 +178,7 @@ void select_tilt() {
 
     mqtt_thread.start(callback(&queue, &EventQueue::dispatch_forever));
     flipper.attach(queue.event(&Angle),100ms);
-
+    
     //btn3.rise(&close_mqtt);
 
     int num = 0;
@@ -209,21 +211,12 @@ void select_tilt() {
 ///////////////////
 // end MQTT part //
 ///////////////////
-/*
-void select_tilt(){
-    //myled2=1;
-    printf("finish2\n");
-    printf("%d\n",Cmode);
-}
-*/
+
 ///////////////////////////
 // define uLCD situation //
 ///////////////////////////
 void situation1()
 {
-  //uLCD_4DGL uLCD(D1, D0, D2); // serial tx, serial rx, reset pin;
-
-  /*
     uLCD.text_width(1); 
     uLCD.text_height(1);
     uLCD.color(BLUE);
@@ -235,18 +228,14 @@ void situation1()
     uLCD.text_width(1); 
     uLCD.text_height(1);
     uLCD.textbackground_color(BLACK);
-    uLCD.printf("\n  45\n  60");*/
+    uLCD.printf("\n  45\n  60");
     
     myled=1;
     myled2=0;
     myled3=0;
-    ThisThread::sleep_for(1s);
 }
 void situation2()
 {
-  //uLCD_4DGL uLCD(D1, D0, D2); // serial tx, serial rx, reset pin;
-
-  /*
     uLCD.text_width(1); 
     uLCD.text_height(1);
     uLCD.color(BLUE);
@@ -262,17 +251,13 @@ void situation2()
     uLCD.text_width(1); 
     uLCD.text_height(1);
     uLCD.textbackground_color(BLACK);            
-    uLCD.printf("\n  60");*/
+    uLCD.printf("\n  60");
     myled=0;
     myled2=1;
     myled3=0;
-    ThisThread::sleep_for(1s);
 }
 void situation3()
 {
-  //uLCD_4DGL uLCD(D1, D0, D2); // serial tx, serial rx, reset pin;
-
-  /*
     uLCD.text_width(1); 
     uLCD.text_height(1);
     uLCD.color(BLUE);
@@ -284,17 +269,14 @@ void situation3()
     uLCD.text_width(1); 
     uLCD.text_height(1);
     uLCD.textbackground_color(WHITE);
-    uLCD.printf("\n  60");*/
+    uLCD.printf("\n  60");
     myled=0;
     myled2=0;
     myled3=1;
-    ThisThread::sleep_for(1s);
 }
 void show_angle()
 {
-  //uLCD_4DGL uLCD(D1, D0, D2); // serial tx, serial rx, reset pin;
-
-  /*
+  uLCD.cls();
   uLCD.text_width(1); 
   uLCD.text_height(1);
   uLCD.color(BLUE);
@@ -302,13 +284,12 @@ void show_angle()
   uLCD.text_width(1); 
   uLCD.text_height(1);
   uLCD.textbackground_color(BLACK);
-  uLCD.printf("\n  %d\n",angle);*/
+  uLCD.printf("\n  %lf\n",angle);
   myled=1;
   myled2=1;
   myled3=1;
-  ThisThread::sleep_for(1s);
+  ThisThread::sleep_for(500ms);
 }
-
 ///////////////////////////////
 // end define uLCD situation //
 ///////////////////////////////
@@ -316,9 +297,9 @@ void show_angle()
 /////////////////////////
 // begin uLCD manifest //
 /////////////////////////
-
 void Mode_confirm(){
   Cmode=situation;
+  uLCD.cls();
   mode=0;
   myled = 1;
   myled2 = 1;
@@ -327,37 +308,33 @@ void Mode_confirm(){
 }
 Thread t;
 void uLCD_mode(){
-  //uLCD_4DGL uLCD(D1, D0, D2); // serial tx, serial rx, reset pin;
-
   while(mode!=0){
     if(mode==1){
-      //myled=1;// enter the gesture selection mode
-      //myled2=0;
       situation1();
       while(mode==1){
         ThisThread::sleep_for(250ms);
         if (situation==1){     
           if (gesture_index==1){
-              //uLCD.cls();
+              uLCD.cls();
               situation2();
               situation=2;
               gesture_index=3;
           }
         } else if (situation==2){         
           if (gesture_index==0){
-            //uLCD.cls();
+            uLCD.cls();
             situation1();
             situation=1;
             gesture_index=3;
           } else if (gesture_index==1) {
-            //uLCD.cls();
+            uLCD.cls();
             situation3();
             situation=3;
             gesture_index=3;
           }
         } else { 
           if (gesture_index==0){
-              //uLCD.cls();
+              uLCD.cls();
               situation2();
               situation=2;
               gesture_index=3;
@@ -367,9 +344,7 @@ void uLCD_mode(){
         Confirm_btn.rise(queue.event(Mode_confirm));
       }
     } else if(mode==2){
-      //myled=0;
-      //myled2=1;
-      //uLCD.cls();
+      uLCD.cls();
       show_angle();
     }
   }
@@ -541,12 +516,14 @@ void MODE(Arguments *in, Reply *out){
 
     sprintf(strings, "/mode%d/write %d", mode, on);
     strcpy(buffer, strings);
+    
     if(mode==1){
       t_gesture.start(select_gesture);
     }else if(mode==2){
       t_tilt.start(select_tilt);
     }
-    t_uLCD_mode.start(uLCD_mode);
+    uLCD_mode();
+    
 
     if (success) {
         printf("success\n");
@@ -555,6 +532,7 @@ void MODE(Arguments *in, Reply *out){
     } else {
         out->putData("Failed to execute LED control.");
     }
+    
 }
 
 int main(){
